@@ -13,15 +13,20 @@ public class CheckersBoard : MonoBehaviour
     private Vector3 pieceOffset = new Vector3(0.5f, 0, 0.5f);
     private Vector2 mouseOver;
     private Vector2 startDrag;
-    private Vector3 endDrag;
-    
+    private Vector2 endDrag;
 
+    
+    private bool isWhite;
+    private bool isWhiteTurn;
+    
     private Piece selectedPiece;
     
     
     private void Start()
     {
+        isWhiteTurn = true;
         GenerateBoard();
+        
     }
 
     private void Update()
@@ -31,7 +36,10 @@ public class CheckersBoard : MonoBehaviour
         {
             int x = (int)mouseOver.x;
             int y = (int)mouseOver.y;
-            
+
+            if (selectedPiece != null)
+                UpdatePieceDrag(selectedPiece);
+
             if(Input.GetMouseButtonDown(0))
                 SelectPiece(x, y);
             if (Input.GetMouseButtonUp(0))
@@ -77,20 +85,90 @@ public class CheckersBoard : MonoBehaviour
         }
     }
 
+    private void UpdatePieceDrag(Piece p)
+    {
+        if (!Camera.main)
+        {
+            Debug.Log("Unable to find main camera");
+            return;
+        }
+
+        RaycastHit hit;
+        if (Physics.Raycast(Camera.main.ScreenPointToRay(Input.mousePosition), out hit, 25.0f,
+                LayerMask.GetMask("Board")))
+        {
+            p.transform.position = hit.point + Vector3.up;
+        }
+    }
+
     private void TryMove(int x1, int y1, int x2, int y2)
     {
         //Multyplayer Support
         startDrag = new Vector2(x1, y1);
         endDrag = new Vector2(x2, y2);
         selectedPiece = pieces[x1, y1];
-        
-        MovePiece(selectedPiece, x2, y2);
-        
-        // Check if we are out of bounds
-        
-        // if there a selected Piece
+
+        if (x2 < 0 || x2 > pieces.Length || y2 < 0 || y2 > pieces.Length)
+        {
+            // out of bounds
+            if (selectedPiece != null)
+                MovePiece(selectedPiece, x1, y1);
+                
+            
+            
+            startDrag = Vector2.zero;
+            selectedPiece = null;
+            return;
+        }
+
+        if (selectedPiece != null)
+        {
+            if (endDrag == startDrag)
+            {
+                MovePiece(selectedPiece, x1, y1);
+                startDrag = Vector2.zero;
+                selectedPiece = null;
+                return;
+            }
+
+            if (selectedPiece.ValidMove(pieces, x1, y1, x2, y2))
+            {
+                //Did we kill anything
+                // If this is a jump
+                if (Mathf.Abs(x2-x2) == 2)
+                {
+                    Piece p = pieces[(x1 + x2) / 2, (y1 + y2) / 2];
+                    if (p != null)
+                    {
+                        pieces[(x1 + x2) / 2, (y1 + y2) / 2] = null;
+                        Destroy(p);
+                    }
+                }
+
+                pieces[x2, y2] = selectedPiece;
+                pieces[x1, y1] = null;
+                MovePiece(selectedPiece, x2, y2);
+
+                EndTurn();
+            }
+        }
+
     }
 
+    private void EndTurn()
+    {
+        selectedPiece = null;
+        startDrag = Vector2.zero;
+
+        isWhiteTurn = !isWhiteTurn;
+        CheckVictory();
+    }
+
+    private void CheckVictory()
+    {
+        
+    }
+    
     private void GenerateBoard()
     {
         // Generate White team
